@@ -89,13 +89,13 @@ let NetscriptFunctions =
     "donateToFaction|"                                                         +
     "createProgram|commitCrime|getCrimeChance|getOwnedAugmentations|"          +
     "getOwnedSourceFiles|getAugmentationsFromFaction|"                         +
-    "getAugmentationCost|purchaseAugmentation|"                                +
+    "getAugmentationPrereq|getAugmentationCost|purchaseAugmentation|"          +
     "installAugmentations|"                                                    +
 
     // TIX API
     "getStockPrice|getStockPosition|getStockSymbols|buyStock|sellStock|"       +
     "shortStock|sellShort|"                                                    +
-    "placeOrder|cancelOrder|getStockVolatility|getStockForecast|"              +
+    "placeOrder|cancelOrder|getOrders|getStockVolatility|getStockForecast|"    +
     "purchase4SMarketData|purchase4SMarketDataTixApi|"                         +
 
     // Hacknet Node API

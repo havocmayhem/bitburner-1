@@ -119,6 +119,7 @@ function Industry(params={}) {
     this.type   = params.type ? params.type : 0;
 
     this.sciResearch    = new Material({name: "Scientific Research"});
+    this.researched = {}; // Object of acquired Research. Keys = research name
 
     //A map of the NAME of materials required to create produced materials to
     //how many are needed to produce 1 unit of produced materials
@@ -1163,44 +1164,65 @@ Industry.prototype.getMarketFactor = function(mat) {
 
 // Returns a boolean indicating whether this Industry has the specified Research
 Industry.prototype.hasResearch = function(name) {
+    return (this.researched[name] === true);
+}
+
+Industry.prototype.updateResearchTree = function() {
     const researchTree = IndustryResearchTrees[this.type];
-    return (researchTree.researched[name] != null);
+
+    // Since ResearchTree data isnt saved, we'll update the Research Tree data
+    // based on the stored 'researched' property in the Industry object
+    if (Object.keys(researchTree.researched).length !== Object.keys(this.researched).length) {
+        console.log("Updating Corporation Research Tree Data");
+        for (let research in this.researched) {
+            researchTree.research(research);
+        }
+    }
 }
 
 // Get multipliers from Research
 Industry.prototype.getAdvertisingMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getAdvertisingMultiplier();
 }
 
 Industry.prototype.getEmployeeChaMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getEmployeeChaMultiplier();
 }
 
 Industry.prototype.getEmployeeCreMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getEmployeeCreMultiplier();
 }
 
 Industry.prototype.getEmployeeEffMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getEmployeeEffMultiplier();
 }
 
 Industry.prototype.getEmployeeIntMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getEmployeeIntMultiplier();
 }
 
 Industry.prototype.getProductionMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getProductionMultiplier();
 }
 
 Industry.prototype.getSalesMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getSalesMultiplier();
 }
 
 Industry.prototype.getScientificResearchMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getScientificResearchMultiplier();
 }
 
 Industry.prototype.getStorageMultiplier = function() {
+    this.updateResearchTree();
     return IndustryResearchTrees[this.type].getStorageMultiplier();
 }
 
@@ -1214,7 +1236,9 @@ Industry.prototype.createResearchBox = function() {
         researchTreeBox = null;
     }
 
+    this.updateResearchTree();
     const researchTree = IndustryResearchTrees[this.type];
+
 
     // Create the popup first, so that the tree diagram can be added to it
     // This is handled by Treant
@@ -1257,8 +1281,8 @@ Industry.prototype.createResearchBox = function() {
                 this.sciResearch.qty -= research.cost;
 
                 // Get the Node from the Research Tree and set its 'researched' property
-                const node = researchTree.findNode(allResearch[i]);
-                node.researched = true;
+                researchTree.research(allResearch[i]);
+                this.researched[allResearch[i]] = true;
 
                 return this.createResearchBox();
             } else {
@@ -2401,11 +2425,16 @@ Warehouse.prototype.createMaterialUI = function(mat, matName, parentRefs) {
         let marketTaClickListener = () => {
             const popupId = "cmpy-mgmt-marketta-popup";
             const markupLimit = mat.getMarkupLimit();
-            const ta1 = createElemenet("p", {
-                innerText: "The maximum sale price you can mark this up to is "  +
+            const ta1 = createElement("p", {
+                innerHTML: "<u><strong>Market-TA.I</strong></u><br>" +
+                           "The maximum sale price you can mark this up to is "  +
                            numeralWrapper.format(mat.bCost + markupLimit, '$0.000a') +
                            ". This means that if you set the sale price higher than this, " +
                            "you will begin to experience a loss in number of sales",
+            });
+            const closeBtn = createPopupCloseButton(popupId, {
+                class: "std-button",
+                display: "block",
             });
 
             if (industry.hasResearch("Market-TA.II")) {
@@ -2418,11 +2447,11 @@ Warehouse.prototype.createMaterialUI = function(mat, matName, parentRefs) {
                         updateTa2Text();
                     },
                     type: "number",
-                    value: mat.sCost,
+                    value: mat.bCost,
                 });
 
                 // Function that updates the text in ta2Text element
-                updateTa2Text = () => {
+                updateTa2Text = function() {
                     const sCost = parseFloat(ta2Input.value);
                     let markup = 1;
                     if (sCost > mat.bCost) {
@@ -2438,15 +2467,16 @@ Warehouse.prototype.createMaterialUI = function(mat, matName, parentRefs) {
                             markup = mat.bCost / sCost;
                         }
                     }
-                    ta2Text.innerText = `If you sell at ${numeralWrapper.format(sCost, "$0.0001")}, ` +
-                                        `then you will sell ${formatNumber(markup, 2)}x as much compared `
+                    ta2Text.innerHTML = `<br><u><strong>Market-TA.II</strong></u><br>` +
+                                        `If you sell at ${numeralWrapper.format(sCost, "$0.0001")}, ` +
+                                        `then you will sell ${formatNumber(markup, 5)}x as much compared ` +
                                         `to if you sold at market price.`;
                 }
                 updateTa2Text();
-                createPopup(popupId, [ta1, ta2Input, ta2Text]);
+                createPopup(popupId, [ta1, ta2Text, ta2Input, closeBtn]);
             } else {
                 // Market-TA.I only
-                createPopup(popupId, [ta1]);
+                createPopup(popupId, [ta1, closeBtn]);
             }
         };
 
@@ -3630,13 +3660,18 @@ Corporation.prototype.displayCorporationOverviewContent = function() {
                                  "per second before taxes.";
                 const txt = createElement("p", { innerHTML: descText, });
 
+                let allocateBtn;
                 const dividendPercentInput = createElement("input", {
                     margin: "5px",
                     placeholder: "Dividend %",
                     type: "number",
+                    onkeyup: (e) => {
+                        e.preventDefault();
+                        if (e.keyCode === 13) {allocateBtn.click();}
+                    }
                 });
 
-                const allocateBtn = createElement("button", {
+                allocateBtn = createElement("button", {
                     class: "std-button",
                     display: "inline-block",
                     innerText: "Allocate Dividend Percentage",
@@ -3653,17 +3688,14 @@ Corporation.prototype.displayCorporationOverviewContent = function() {
                     }
                 });
 
-                const cancelBtn = createElement("button", {
+                const cancelBtn = createPopupCloseButton(popupId, {
                     class: "std-button",
                     display: "inline-block",
                     innerText: "Cancel",
-                    clickListener:  () => {
-                        removeElementById(popupId);
-                        return false;
-                    }
-                })
+                });
 
                 createPopup(popupId, [txt, dividendPercentInput, allocateBtn, cancelBtn]);
+                dividendPercentInput.focus();
             },
         });
         companyManagementPanel.appendChild(issueDividends);
@@ -3971,7 +4003,10 @@ Corporation.prototype.displayDivisionContent = function(division, city) {
         fontSize:"14px",
     }));
     industryOverviewUpgrades.appendChild(createElement("br", {}));
-    for (var i = 0; i < numUpgrades; ++i) {
+    for (let i = 0; i < numUpgrades; ++i) {
+        if (division.hasResearch("AutoBrew") && i == 0) {
+            continue; // AutoBrew disables Coffee upgrades, which is index 0
+        }
         (function(i, corp, division, office) {
             var upgrade = IndustryUpgrades[i.toString()];
             if (upgrade == null) {
@@ -4300,72 +4335,74 @@ Corporation.prototype.displayDivisionContent = function(division, city) {
     industryEmployeePanel.appendChild(industryOfficeUpgradeSizeButton);
 
     //Throw Office Party
-    industryEmployeePanel.appendChild(createElement("a", {
-        class:"a-link-button", display:"inline-block", innerText:"Throw Party",
-        fontSize:"13px",
-        tooltip:"Throw an office party to increase your employee's morale and happiness",
-        clickListener:()=>{
-            var popupId = "cmpy-mgmt-throw-office-party-popup";
-            var txt = createElement("p", {
-                innerText:"Enter the amount of money you would like to spend PER EMPLOYEE " +
-                          "on this office party"
-            });
-            var totalCostTxt = createElement("p", {
-                innerText:"Throwing this party will cost a total of $0"
-            });
-            var confirmBtn;
-            var input = createElement("input", {
-                type:"number", margin:"5px", placeholder:"$ / employee",
-                inputListener:()=>{
-                    if (isNaN(input.value) || input.value < 0) {
-                        totalCostTxt.innerText = "Invalid value entered!"
-                    } else {
-                        var totalCost = input.value * office.employees.length;
-                        totalCostTxt.innerText = "Throwing this party will cost a total of " + numeralWrapper.format(totalCost, '$0.000a');
-                    }
-                },
-                onkeyup:(e)=>{
-                    e.preventDefault();
-                    if (e.keyCode === 13) {confirmBtn.click();}
-                }
-            });
-            confirmBtn = createElement("a", {
-                class:"a-link-button",
-                display:"inline-block",
-                innerText:"Throw Party",
-                clickListener:()=>{
-                    if (isNaN(input.value) || input.value < 0) {
-                        dialogBoxCreate("Invalid value entered");
-                    } else {
-                        var totalCost = input.value * office.employees.length;
-                        if (this.funds.lt(totalCost)) {
-                            dialogBoxCreate("You don't have enough company funds to throw this party!");
+    if (!division.hasResearch("AutoPartyManager")) {
+        industryEmployeePanel.appendChild(createElement("a", {
+            class:"a-link-button", display:"inline-block", innerText:"Throw Party",
+            fontSize:"13px",
+            tooltip:"Throw an office party to increase your employee's morale and happiness",
+            clickListener:()=>{
+                var popupId = "cmpy-mgmt-throw-office-party-popup";
+                var txt = createElement("p", {
+                    innerText:"Enter the amount of money you would like to spend PER EMPLOYEE " +
+                              "on this office party"
+                });
+                var totalCostTxt = createElement("p", {
+                    innerText:"Throwing this party will cost a total of $0"
+                });
+                var confirmBtn;
+                var input = createElement("input", {
+                    type:"number", margin:"5px", placeholder:"$ / employee",
+                    inputListener:()=>{
+                        if (isNaN(input.value) || input.value < 0) {
+                            totalCostTxt.innerText = "Invalid value entered!"
                         } else {
-                            this.funds = this.funds.minus(totalCost);
-                            var mult;
-                            for (var fooit = 0; fooit < office.employees.length; ++fooit) {
-                                mult = office.employees[fooit].throwParty(input.value);
-                            }
-                            dialogBoxCreate("You threw a party for the office! The morale and happiness " +
-                                            "of each employee increased by " + formatNumber((mult-1) * 100, 2) + "%.");
-                            removeElementById(popupId);
+                            var totalCost = input.value * office.employees.length;
+                            totalCostTxt.innerText = "Throwing this party will cost a total of " + numeralWrapper.format(totalCost, '$0.000a');
                         }
+                    },
+                    onkeyup:(e)=>{
+                        e.preventDefault();
+                        if (e.keyCode === 13) {confirmBtn.click();}
                     }
-                    return false;
-                }
-            });
-            var cancelBtn = createElement("a", {
-                class:"a-link-button",
-                display:"inline-block",
-                innerText:"Cancel",
-                clickListener:()=>{
-                    removeElementById(popupId);
-                    return false;
-                }
-            });
-            createPopup(popupId, [txt, totalCostTxt, input, confirmBtn, cancelBtn]);
-        }
-    }));
+                });
+                confirmBtn = createElement("a", {
+                    class:"a-link-button",
+                    display:"inline-block",
+                    innerText:"Throw Party",
+                    clickListener:()=>{
+                        if (isNaN(input.value) || input.value < 0) {
+                            dialogBoxCreate("Invalid value entered");
+                        } else {
+                            var totalCost = input.value * office.employees.length;
+                            if (this.funds.lt(totalCost)) {
+                                dialogBoxCreate("You don't have enough company funds to throw this party!");
+                            } else {
+                                this.funds = this.funds.minus(totalCost);
+                                var mult;
+                                for (var fooit = 0; fooit < office.employees.length; ++fooit) {
+                                    mult = office.employees[fooit].throwParty(input.value);
+                                }
+                                dialogBoxCreate("You threw a party for the office! The morale and happiness " +
+                                                "of each employee increased by " + formatNumber((mult-1) * 100, 2) + "%.");
+                                removeElementById(popupId);
+                            }
+                        }
+                        return false;
+                    }
+                });
+                var cancelBtn = createElement("a", {
+                    class:"a-link-button",
+                    display:"inline-block",
+                    innerText:"Cancel",
+                    clickListener:()=>{
+                        removeElementById(popupId);
+                        return false;
+                    }
+                });
+                createPopup(popupId, [txt, totalCostTxt, input, confirmBtn, cancelBtn]);
+            }
+        }));
+    }
 
     industryEmployeeManagementUI = createElement("div", {});
     industryEmployeeInfo = createElement("p", {margin:"4px", padding:"4px"});

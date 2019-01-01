@@ -1512,6 +1512,21 @@ button {
 #import-game-file-selector {
   display: none; }
 
+/* Styling for the game options/settings
+ *
+ *  Styling for the actual Game Options popup box can be found in popupboxes.scss
+ *  This stylesheet is for everything inside the Game Options pop-up box
+ */
+/* COLORS */
+/* Attributes */
+#game-options-right-panel a {
+  display: block;
+  width: 46%; }
+
+#game-options-right-panel button {
+  display: inline-block;
+  width: 46%; }
+
 /* COLORS */
 /* Attributes */
 /* interactivetutorial.css */
@@ -2169,7 +2184,9 @@ button {
   font-size: 12px; }
 
 .Treant > .researched {
-  background-color: #444; }
+  background-color: #666;
+  pointer-events: none;
+  font-size: 16px; }
 
 .Treant > .locked > div {
   color: red;
